@@ -1,0 +1,41 @@
+{{define "Header"}}
+<!DOCTYPE HTML>
+<!--
+	TXT by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+<li><a class="icon fa-solid fa-file" href="#"></a></li>
+-->
+<html>
+	<head>
+		<title>{{.CurrentPage.Title}} | {{.SiteMetaData.Domain}}</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="{{.CurrentPage.SiteRoot}}/assets/css/main.css" />
+		<link rel="stylesheet" href="{{.CurrentPage.SiteRoot}}/assets/css/extend.css" />
+	</head>
+	<body class="is-preload">
+		<div id="page-wrapper">
+
+			<!-- Header -->
+				<header id="header">
+					<div class="logo container">
+						<div>
+							<h1 ><a href="{{$.CurrentPage.SiteRoot}}/index.html" id="logo">{{.SiteMetaData.Title}}</a></h1>
+							<p>//{{.CurrentPage.Title}}</p>
+						</div>
+					</div>
+				</header>
+
+			<!-- Nav -->
+				<nav id="nav">
+					<ul>
+						<li><a href="{{.CurrentPage.SiteRoot}}/index.html">Home</a></li>
+					{{.TopNav}}
+					<li><a class="icon brands fa-twitter" href="{{.SiteMetaData.Twitter}}"></a></li>
+					<li><a class="icon brands fa-linkedin-in" href="{{.SiteMetaData.Linkedin}}"></a></li>
+					<li><a class="icon brands fa-github" href="{{.SiteMetaData.Github}}"></a></li>
+				</ul>
+
+				</nav>
+{{end}}

@@ -1,0 +1,45 @@
+{{define "Footer"}}
+    <!-- Footer -->
+        <footer id="footer">
+            <div class="container">
+                <div class="row gtr-200">
+                    <div class="col-12">
+
+                        <!-- Contact -->
+                            <section>
+                                <h2 class="major"><span>Get in touch</span></h2>
+                                <ul class="contact">
+                                    <li><a class="icon brands fa-twitter" href="{{.SiteMetaData.Twitter}}"><span class="label">Twitter</span></a></li>
+                                    <li><a class="icon brands fa-linkedin-in" href="{{.SiteMetaData.Linkedin}}"><span class="label">LinkedIn</span></a></li>
+                                    <li><a class="icon brands fa-github" href="{{.SiteMetaData.Github}}"><span class="label">Github</span></a></li>
+                                </ul>
+                            </section>
+
+                    </div>
+                </div>
+
+                <!-- Copyright -->
+                    <div id="copyright">
+                        <ul class="menu">
+                            <li>&copy; Andreas Wiebe. All rights reserved</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+                        </ul>
+                    </div>
+
+            </div>
+        </footer>
+
+</div>
+
+<!-- Scripts -->
+    <script src="{{.CurrentPage.SiteRoot}}/assets/js/jquery.min.js"></script>
+    <script src="{{.CurrentPage.SiteRoot}}/assets/js/jquery.dropotron.min.js"></script>
+    <script src="{{.CurrentPage.SiteRoot}}/assets/js/jquery.scrolly.min.js"></script>
+    <script src="{{.CurrentPage.SiteRoot}}/assets/js/browser.min.js"></script>
+    <script src="{{.CurrentPage.SiteRoot}}/assets/js/breakpoints.min.js"></script>
+    <script src="{{.CurrentPage.SiteRoot}}/assets/js/util.js"></script>
+    <script src="{{.CurrentPage.SiteRoot}}/assets/js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+
+</body>
+</html>
+{{end}}

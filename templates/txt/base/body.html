@@ -1,0 +1,36 @@
+{{define "Body"}}
+        <!-- Main -->
+        <section id="main">
+                <div class="container">                    
+                    
+                    <div class="row">
+                        
+
+                        <div class="col-12">
+                            <div class="content">
+                                
+                                <!-- Content -->
+
+                                    <article class="box page-content">
+                                        <header>
+                                            <h2>{{.CurrentPage.Title}}</h2>
+                                            <div>{{.CurrentPage.Nav}}</div>
+                                            <p>{{.CurrentPage.Excerpt}}</p>
+                                            <!--<ul class="meta">
+                                                <li class="icon fa-clock">5 days ago</li>
+                                                <li class="icon fa-comments"><a href="#">1,024</a></li>
+                                            </ul>-->
+                                            
+                                        </header>
+
+                                        <section>
+                                            {{.Toc}}
+                                            {{.CurrentPage.Content}}
+                                        </section>
+                                    </article>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {{end}}

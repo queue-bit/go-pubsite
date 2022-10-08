@@ -509,12 +509,12 @@ func main() {
 		}
 
 		//skip if it's the .config directory or the site.yaml
-		/*if info.Name() == ".config" || info.Name() == "config.yaml" || info.Name() == ".github" || info.Name() == ".git" || info.Name() == "workflows" || info.Name() == "build-site.yaml" {
+		if info.Name() == ".config" || info.Name() == "config.yaml" || info.Name() == ".github" || info.Name() == ".git" || info.Name() == "workflows" || info.Name() == "build-site.yaml" {
 			return nil
-		}*/
+		}
 
 		//skip if it's a .config directory, a .yaml file, or a .git file/directory
-		if strings.Contains(currentFile, ".yaml") || strings.Contains(currentFile, ".git") || strings.Contains(currentFile, ".config") || strings.Contains(currentFile, "README.md") {
+		if strings.Contains(currentFile, ".yaml") || strings.Contains(currentFile, ".config") || strings.Contains(currentFile, "README.md") {
 			return nil
 		}
 

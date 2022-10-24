@@ -4,7 +4,7 @@ This is a Go program to generate my site, I wanted something that allowed me to 
 
 This is an MVP for my specific use and has a fairly large backlog of technical debt, it is not intended for use by others. 
 
-**I strongly suggest you check out [Hugo](https://gohugo.io/) instead.**
+**If you are going to use this, please fork it as future updates _will_ break things. [I strongly suggest you use Hugo instead.](https://gohugo.io/)**
 
 - [About](#about)
 - [Directories](#directories)
@@ -20,6 +20,7 @@ This is an MVP for my specific use and has a fairly large backlog of technical d
   - [/content/.config/config.yaml](#contentconfigconfigyaml)
   - [Ignored Files](#ignored-files)
 - [Markdown Content Processing](#markdown-content-processing)
+  - [Frontmatter](#frontmatter)
   - [Table of Contents](#table-of-contents)
   - [Diagrams](#diagrams)
   - [Mixed Markdown and HTML](#mixed-markdown-and-html)
@@ -137,6 +138,25 @@ When the content directory is processed, filenames and directory names that cont
 
 
 # Markdown Content Processing
+
+## Frontmatter
+
+Frontmatter is supported, defined at the top of the document between three dashes `---`. Currently supported tags:
+
+1. title
+1. excerpt
+1. tags (future use)
+
+Note that the excerpt is displayed on content pages between the breadcrumb navigation and TOC.
+
+Example:
+```
+---
+title:  "A sample title"
+excerpt: "Excerpt I want to display between the breadcrumbs and the TOC"
+tags: "future use tags"
+---
+```
 
 ## Table of Contents
 

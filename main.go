@@ -31,26 +31,28 @@ import (
 )
 
 type Config struct {
-	Title        string `yaml:"title"`
-	Domain       string `yaml:"domain"`
-	Email        string `yaml:"email"`
-	Github       string `yaml:"github"`
-	Linkedin     string `yaml:"linkedin"`
-	Twitter      string `yaml:"twitter"`
-	TemplateName string `yaml:"templatename"`
-	BaseURL      string `yaml:"baseurl"`
+	Title        string        `yaml:"title"`
+	Domain       string        `yaml:"domain"`
+	Email        string        `yaml:"email"`
+	Github       string        `yaml:"github"`
+	Linkedin     string        `yaml:"linkedin"`
+	Twitter      string        `yaml:"twitter"`
+	TemplateName string        `yaml:"templatename"`
+	BaseURL      string        `yaml:"baseurl"`
+	Analytics    template.HTML `yaml:"analytics"`
 }
 
 type Page struct {
-	Title    string
-	Content  template.HTML
-	Path     string
-	SiteRoot string
-	Category string
-	Section  string
-	Index    int
-	Nav      template.HTML
-	Excerpt  template.HTML
+	Title     string
+	Content   template.HTML
+	Path      string
+	SiteRoot  string
+	Category  string
+	Section   string
+	Index     int
+	Nav       template.HTML
+	Excerpt   template.HTML
+	Analytics template.HTML
 }
 
 type Category struct {
@@ -222,15 +224,16 @@ func parsePage(workingFile string, paths Paths, siteConfig Config) Page {
 	}
 
 	return Page{
-		Title:    title,
-		Content:  template.HTML(buf.String()),
-		Path:     outFile,
-		Category: pageCategory.Title,
-		Section:  pageSection.Title,
-		Index:    pageSection.Index,
-		SiteRoot: siteConfig.BaseURL,
-		Nav:      template.HTML(pageNav),
-		Excerpt:  template.HTML(pageExcerpt),
+		Title:     title,
+		Content:   template.HTML(buf.String()),
+		Path:      outFile,
+		Category:  pageCategory.Title,
+		Section:   pageSection.Title,
+		Index:     pageSection.Index,
+		SiteRoot:  siteConfig.BaseURL,
+		Nav:       template.HTML(pageNav),
+		Excerpt:   template.HTML(pageExcerpt),
+		Analytics: siteConfig.Analytics,
 	}
 
 }
@@ -448,14 +451,15 @@ func buildNavigation(sections []Section, categories []Category, pages []Page, pa
 		sectionNav := "<a href=\"" + siteConfig.BaseURL + "\">Home</a> // " + strings.Replace(cases.Title(language.Und).String(currentSection.Crumb), "-", " ", 1)
 
 		sectionPage := Page{
-			Title:    currentSection.Title,
-			Content:  template.HTML(sectionPageHtml.String()),
-			Path:     paths.Output + "/" + currentSection.Crumb + "/index.html",
-			Category: currentSection.Title,
-			Section:  currentSection.Title,
-			Index:    currentSection.Index,
-			SiteRoot: siteConfig.BaseURL,
-			Nav:      template.HTML(sectionNav),
+			Title:     currentSection.Title,
+			Content:   template.HTML(sectionPageHtml.String()),
+			Path:      paths.Output + "/" + currentSection.Crumb + "/index.html",
+			Category:  currentSection.Title,
+			Section:   currentSection.Title,
+			Index:     currentSection.Index,
+			SiteRoot:  siteConfig.BaseURL,
+			Nav:       template.HTML(sectionNav),
+			Analytics: siteConfig.Analytics,
 		}
 		pages = append(pages, sectionPage)
 		topNav.WriteString("</ul></li>")
@@ -508,13 +512,15 @@ func main() {
 			log.Fatalf(err.Error())
 		}
 
-		//skip if it's the .config directory or the site.yaml
+		// Skip if it's the .config directory or the site.yaml
+		// We'll still end up with a .git directory due to subdirectories existing but they'll all be empty - this should be fixed
 		if info.Name() == ".config" || info.Name() == "config.yaml" || info.Name() == ".github" || info.Name() == ".git" || info.Name() == "workflows" || info.Name() == "build-site.yaml" {
+			fmt.Printf("Skipping %s\n", info.Name())
 			return nil
 		}
 
 		//skip if it's a .config directory, a .yaml file, or a .git file/directory
-		if strings.Contains(currentFile, ".yaml") || strings.Contains(currentFile, ".config") || strings.Contains(currentFile, "README.md") {
+		if strings.Contains(currentFile, ".yaml") || strings.Contains(currentFile, ".config") || strings.Contains(currentFile, "README.md") || strings.Contains(currentFile, ".sample") {
 			return nil
 		}
 

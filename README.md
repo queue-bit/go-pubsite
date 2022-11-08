@@ -6,6 +6,8 @@ This is an MVP for my specific use and has a fairly large backlog of technical d
 
 **If you are going to use this, please either fork it or use the version tagging as future updates _will_ break things. [I strongly suggest you use Hugo instead.](https://gohugo.io/)**
 
+You can [read more about this program](https://www.andreaswiebe.com/homelab-notes/projects/this-site) on my site
+
 - [About](#about)
 - [Directories](#directories)
   - [Content Directory --> */content/*](#content-directory----content)

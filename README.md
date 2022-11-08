@@ -4,7 +4,7 @@ This is a Go program to generate my site, I wanted something that allowed me to 
 
 This is an MVP for my specific use and has a fairly large backlog of technical debt, it is not intended for use by others. 
 
-**If you are going to use this, please fork it as future updates _will_ break things. [I strongly suggest you use Hugo instead.](https://gohugo.io/)**
+**If you are going to use this, please either fork it or use the version tagging as future updates _will_ break things. [I strongly suggest you use Hugo instead.](https://gohugo.io/)**
 
 - [About](#about)
 - [Directories](#directories)
@@ -124,7 +124,11 @@ email:          Your email address (caution, this displays on the site)
 github:         Link to your github account (https://github.com/example-user)
 linkedin:       Link to your linkedin account (https://www.linkedin.com/in/example-user)
 twitter:        Link to your twitter account (https://twitter.com/example-user)
-
+analytics:      HTML of your analytics tags
+ogtype:         Default OpenGraph type, can be overridden by article pages via frontmatter
+author:         Default author, can be overridden by article pages via frontmatter
+ogimage:        Default OpenGraph image, can be overridden by article pages via frontmatter
+faviconpath:    The relative path to the favicon
 ```
 
 ## Ignored Files
@@ -152,9 +156,14 @@ Note that the excerpt is displayed on content pages between the breadcrumb navig
 Example:
 ```
 ---
-title:  "A sample title"
-excerpt: "Excerpt I want to display between the breadcrumbs and the TOC"
-tags: "future use tags"
+title:        "A sample title"
+intro:        "Excerpt I want to display between the breadcrumbs and the TOC"
+tags:         "Comma separated list of tags, used in OpenGraph metadata on the site"
+ogtype:       "OpenGraph type for the page"
+author:       "Author for the page, used in OpenGraph metadata"
+description:  "Description for the page, used in metadata and OpenGraph metadata"
+date:         "Publish date for the page, used in OpenGraph metadata"
+ogimage:      "OpenGraph image for the page, used in OpenGraph metadata"
 ---
 ```
 

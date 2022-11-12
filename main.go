@@ -45,6 +45,13 @@ type Config struct {
 	FavIconPath   string        `yaml:"faviconpath"`
 }
 
+type Redirects struct {
+	Redirect []struct {
+		From string `yaml:"from"`
+		To   string `yaml:"to"`
+	} `yaml:"redirect"`
+}
+
 type Page struct {
 	Title       string
 	Content     template.HTML
@@ -63,6 +70,8 @@ type Page struct {
 	Date        string
 	OgImage     string
 	Tags        string
+	ChangeFreq  string
+	Priority    string
 }
 
 type Category struct {
@@ -78,55 +87,99 @@ type Section struct {
 }
 
 type Paths struct {
-	Content      string
-	Output       string
-	Template     string
-	Asset        string
-	TemplateSub  string
-	TemplateRoot string
+	Content          string
+	Output           string
+	Template         string
+	Asset            string
+	TemplateSub      string
+	TemplateRoot     string
+	CurrentDirectory string
 }
 
 type TopNav struct {
 	Nav template.HTML
 }
 
-//Setup some site metadata
-func siteMeta(configFile string) Config {
+//Global Vars
+var configFile string = "./content/.config/config.yaml"
+var redirectFile string = "./content/.config/redirects.yaml"
+var siteMeta Config
+var siteRedirects Redirects
+var sitePaths Paths
 
+//Load config and redirect files
+func loadSiteMeta() {
+
+	//--- Get metadata from config file (must exist)
 	config := Config{}
 
-	file, err := os.Open(configFile)
+	cFile, err := os.Open(configFile)
 	if err != nil {
 		panic("Could not open configuration file")
+	} else {
+		log.Println("Loading configuration file.")
 	}
-	defer file.Close()
+	defer cFile.Close()
 
-	// Init new YAML decode
-	d := yaml.NewDecoder(file)
+	// Init and start new YAML decode
+	c := yaml.NewDecoder(cFile)
 
-	// Start YAML decoding from file
-	if err := d.Decode(&config); err != nil {
-		return Config{}
+	if err := c.Decode(&config); err != nil {
+		siteMeta = Config{}
 	}
-	return config
+	siteMeta = config
+
+	//--- Get redirects from file if it exists
+	if _, err := os.Stat(redirectFile); err == nil {
+
+		log.Println("Loading redirects file.")
+
+		redirects := Redirects{}
+
+		rfile, err := os.Open(redirectFile)
+		if err != nil {
+			panic("Redirects file exists but could not open it")
+		}
+		defer rfile.Close()
+
+		// Init and start new YAML decode
+		r := yaml.NewDecoder(rfile)
+
+		if err := r.Decode(&redirects); err != nil {
+			siteRedirects = Redirects{}
+		}
+		siteRedirects = redirects
+	} else {
+		log.Println("No Redirects file, skipping.")
+		return
+	}
+
 }
 
 //Setup some default paths
-func paths(currentDirectory string, siteConfig Config) Paths {
-	currentTemplate := "/templates/" + siteConfig.TemplateName
+func setPaths() {
+
+	currentDirectory, lpErr := os.Getwd()
+	if lpErr != nil {
+		log.Fatal(lpErr)
+	}
+
+	currentTemplate := "/templates/" + siteMeta.TemplateName
 	contentDirectory := currentDirectory + "/content"
 	outputDirectory := strings.Replace(contentDirectory, "content", "out", 1)
 	templateDirectory := currentDirectory + currentTemplate + "/base/"
 	assetDirectory := currentDirectory + currentTemplate + "/assets/"
 
-	return Paths{
-		Content:      contentDirectory,
-		Output:       outputDirectory,
-		Template:     templateDirectory,
-		Asset:        assetDirectory,
-		TemplateSub:  currentTemplate + "/base/",
-		TemplateRoot: currentTemplate,
+	sitePaths = Paths{
+		Content:          contentDirectory,
+		Output:           outputDirectory,
+		Template:         templateDirectory,
+		Asset:            assetDirectory,
+		TemplateSub:      currentTemplate + "/base/",
+		TemplateRoot:     currentTemplate,
+		CurrentDirectory: currentDirectory,
 	}
+
 }
 
 /*	Content is split up by directories
@@ -138,7 +191,6 @@ func pageSection(workingFile string) Section {
 
 	sectionMatches := sectionRe.FindStringSubmatch(workingFile)
 	if len(sectionMatches) >= 1 {
-		//section = fmt.Sprintf("%s", sectionMatches[2])
 		section = sectionMatches[2]
 		index, _ = strconv.Atoi(sectionMatches[1])
 	} else {
@@ -177,7 +229,7 @@ func pageCategory(workingFile string) Category {
 	}
 }
 
-func parsePage(workingFile string, paths Paths, siteConfig Config) Page {
+func parsePage(workingFile string) Page {
 
 	outFile := strings.Replace(workingFile, "content", "out", 1)
 	outFile = strings.Replace(outFile, ".md", ".html", 1)
@@ -209,39 +261,57 @@ func parsePage(workingFile string, paths Paths, siteConfig Config) Page {
 	if err := md.Convert(content, &buf, parser.WithContext(context)); err != nil {
 		panic(err)
 	}
-	metaData := meta.Get(context)
-	title := metaData["title"].(string)
+	frontMatter := meta.Get(context)
 	pageCategory := pageCategory(workingFile)
 	pageSection := pageSection(workingFile)
-	pageIntro := metaData["intro"].(string)
-	pageDescription := metaData["description"].(string)
+
+	var title string
+	if frontMatter["title"] == nil {
+		title = filepath.Base(outFile)
+	} else {
+		title = frontMatter["title"].(string)
+	}
+
+	var pageIntro string
+	if frontMatter["intro"] == nil {
+		pageIntro = ""
+	} else {
+		pageIntro = frontMatter["intro"].(string)
+	}
+
+	var pageDescription string
+	if frontMatter["description"] == nil {
+		pageDescription = ""
+	} else {
+		pageDescription = frontMatter["description"].(string)
+	}
 
 	var ogImage string
-	if metaData["ogimage"] == nil {
-		ogImage = siteConfig.BaseURL + "/media/" + siteConfig.OgImage
+	if frontMatter["ogimage"] == nil {
+		ogImage = siteMeta.BaseURL + "/media/" + siteMeta.OgImage
 	} else {
-		ogImage = siteConfig.BaseURL + "/media/" + metaData["ogimage"].(string)
+		ogImage = siteMeta.BaseURL + "/media/" + frontMatter["ogimage"].(string)
 	}
 
 	var ogType string
-	if metaData["ogtype"] == nil {
-		ogType = siteConfig.DefaultOgType
+	if frontMatter["ogtype"] == nil {
+		ogType = siteMeta.DefaultOgType
 	} else {
-		ogType = metaData["ogtype"].(string)
+		ogType = frontMatter["ogtype"].(string)
 	}
 
 	var tags string
-	if metaData["tags"] == nil {
+	if frontMatter["tags"] == nil {
 		tags = ""
 	} else {
-		tags = metaData["tags"].(string)
+		tags = frontMatter["tags"].(string)
 	}
 
 	var articleDate string
-	if metaData["date"] == "" {
+	if frontMatter["date"] == nil {
 		articleDate = ""
 	} else {
-		articleDate = metaData["date"].(string)
+		articleDate = frontMatter["date"].(string)
 	}
 
 	outFile = strings.Replace(outFile, strconv.Itoa(pageSection.Index)+"_", "", 1)
@@ -251,13 +321,16 @@ func parsePage(workingFile string, paths Paths, siteConfig Config) Page {
 	categoryCrumb = pageCategory.Crumb[strings.LastIndex(pageCategory.Crumb, " ")+1:]
 	categoryCrumb = strings.TrimRight(categoryCrumb, "]")
 
-	pageUrl := siteConfig.BaseURL + strings.Split(outFile, "/out")[1]
+	pageUrl := siteMeta.BaseURL + strings.Split(outFile, "/out")[1]
 
 	var pageNav string
 	if pageSection.Crumb == "" {
 		pageNav = ""
 	} else {
-		pageNav = "<a href=\"" + siteConfig.BaseURL + "\">Home</a> // <a href=\"" + siteConfig.BaseURL + "/" + pageSection.Crumb + "\">" + strings.Replace(cases.Title(language.Und).String(pageSection.Crumb), "-", " ", 1) + "</a>" + " // " + "<a href=\"" + siteConfig.BaseURL + "/" + pageSection.Crumb + "/" + categoryCrumb + "\">" + strings.Replace(cases.Title(language.Und).String(categoryCrumb), "-", " ", 1) + "</a> // " + title
+		pageNav = "<a href=\"" + siteMeta.BaseURL + "\">Home</a> // <a href=\"" + siteMeta.BaseURL + "/" + pageSection.Crumb + "\">"
+		pageNav += strings.Replace(cases.Title(language.Und).String(pageSection.Crumb), "-", " ", 1) + "</a>"
+		pageNav += " // " + "<a href=\"" + siteMeta.BaseURL + "/" + pageSection.Crumb + "/" + categoryCrumb + "\">"
+		pageNav += strings.Replace(cases.Title(language.Und).String(categoryCrumb), "-", " ", 1) + "</a> // " + title
 	}
 
 	return Page{
@@ -267,17 +340,19 @@ func parsePage(workingFile string, paths Paths, siteConfig Config) Page {
 		Category:    pageCategory.Title,
 		Section:     pageSection.Title,
 		Index:       pageSection.Index,
-		SiteRoot:    siteConfig.BaseURL,
+		SiteRoot:    siteMeta.BaseURL,
 		Nav:         template.HTML(pageNav),
 		Intro:       template.HTML(pageIntro),
 		Description: template.HTML(pageDescription),
-		Analytics:   siteConfig.Analytics,
-		Author:      siteConfig.Author,
+		Analytics:   siteMeta.Analytics,
+		Author:      siteMeta.Author,
 		OgType:      ogType,
 		Url:         strings.Replace(pageUrl, ".html", "", 1),
 		Date:        articleDate,
 		OgImage:     ogImage,
 		Tags:        tags,
+		ChangeFreq:  "monthly",
+		Priority:    "0.5",
 	}
 
 }
@@ -319,7 +394,7 @@ func copyFile(currentFile string, outPath string) {
 
 }
 
-func createPage(currentPage Page, sections []Section, topNav template.HTML, siteConfig Config) {
+func createPage(currentPage Page, sections []Section, topNav template.HTML) {
 	var templateFiles = []string{"header.html", "footer.html", "body.html", "base.html"}
 	var allPaths []string
 
@@ -331,7 +406,7 @@ func createPage(currentPage Page, sections []Section, topNav template.HTML, site
 	defer file.Close()
 
 	for _, tmpl := range templateFiles {
-		allPaths = append(allPaths, "./"+paths(currentPage.Path, siteConfig).TemplateSub+tmpl)
+		allPaths = append(allPaths, "./"+sitePaths.TemplateSub+tmpl)
 	}
 
 	templates := template.Must(template.New("").ParseFiles(allPaths...))
@@ -339,7 +414,7 @@ func createPage(currentPage Page, sections []Section, topNav template.HTML, site
 	Toc := addToc(string(currentPage.Content), string(currentPage.Title))
 
 	var processed bytes.Buffer
-	err = templates.ExecuteTemplate(&processed, "Base", struct{ CurrentPage, SiteMetaData, TopNav, Toc, Sections interface{} }{currentPage, siteConfig, topNav, Toc, sections})
+	err = templates.ExecuteTemplate(&processed, "Base", struct{ CurrentPage, SiteMetaData, TopNav, Toc, Sections interface{} }{currentPage, siteMeta, topNav, Toc, sections})
 
 	if err != nil {
 		log.Fatal("FATAL: ", err, " Could not ExecuteTemplate for ", currentPage.Path, " in createPage(Page,Section,template.HTML,Config")
@@ -399,20 +474,19 @@ func addToc(currentHtmlString string, currentTitle string) template.HTML {
 					level = 5
 				}
 
-				lastLevel, tocLineItem = levels(level, lastLevel, tocLinkItem)
+				lastLevel, tocLineItem = tocLevels(level, lastLevel, tocLinkItem)
 
 				if tocLineItem != "" {
 					lastToc = lastToc + tocLineItem
 					count++
 				}
-
 			}
-
 		}
-
 	}
+
 	var closeTags string
 
+	// We need to close out the lists (ul's and li's) that were opened
 	for i := lastLevel; i > 0; i-- {
 		closeTags = closeTags + "<!--cbs--></li></ul>"
 	}
@@ -425,7 +499,7 @@ func addToc(currentHtmlString string, currentTitle string) template.HTML {
 
 }
 
-func levels(level int, lastLevel int, tocLinkItem string) (int, string) {
+func tocLevels(level int, lastLevel int, tocLinkItem string) (int, string) {
 	//adapted from https://stackoverflow.com/a/4912737
 	tocLineItem := ""
 	closeTags := ""
@@ -443,7 +517,7 @@ func levels(level int, lastLevel int, tocLinkItem string) (int, string) {
 	return lastLevel, tocLineItem + "\n"
 }
 
-func buildNavigation(sections []Section, categories []Category, pages []Page, paths Paths, siteConfig Config) (strings.Builder, []Page) {
+func buildNavigation(sections []Section, categories []Category, pages []Page) (strings.Builder, []Page) {
 	var parentCategory string
 	var category string
 	var categoryCrumb string
@@ -457,7 +531,7 @@ func buildNavigation(sections []Section, categories []Category, pages []Page, pa
 		}
 		sectionPageHtml.Reset()
 		sectionPageHtml.WriteString("<ul>")
-		topNav.WriteString("<li>\n<a href=\"" + siteConfig.BaseURL + "/" + currentSection.Crumb + "\">" + strings.Replace(currentSection.Crumb, "-", " ", 1) + "</a>\n<ul>\n")
+		topNav.WriteString("<li>\n<a href=\"" + siteMeta.BaseURL + "/" + currentSection.Crumb + "\">" + strings.Replace(currentSection.Crumb, "-", " ", 1) + "</a>\n<ul>\n")
 		for _, currentCategory := range categories {
 			categoryPageHtml.Reset()
 			parentCategory = currentCategory.Parent[strings.LastIndex(currentCategory.Parent, " ")+1:]
@@ -469,16 +543,13 @@ func buildNavigation(sections []Section, categories []Category, pages []Page, pa
 				category = currentCategory.Title[strings.LastIndex(currentCategory.Title, " ")+1:]
 				category = strings.Replace(strings.TrimRight(category, "]"), "-", " ", 1)
 
-				//topNav.WriteString("<li><a href=\"" + siteConfig.BaseURL + "/" + currentSection.Crumb + "/" + categoryCrumb + "/index.html\">" + strings.Replace(categoryCrumb, "-", " ", 1) + "</a>\n<ul>\n")
-				topNav.WriteString("<li><a href=\"" + siteConfig.BaseURL + "/" + currentSection.Crumb + "/" + categoryCrumb + "\">" + strings.Replace(categoryCrumb, "-", " ", 1) + "</a>\n<ul>\n")
-				//				sectionPageHtml.WriteString("<li><b><a href=\"" + siteConfig.BaseURL + "/" + currentSection.Crumb + "/" + categoryCrumb + "/index.html\">" + strings.Replace(category, "-", " ", 1) + "</a></b></li>\n")
-				sectionPageHtml.WriteString("<li><b><a href=\"" + siteConfig.BaseURL + "/" + currentSection.Crumb + "/" + categoryCrumb + "\">" + strings.Replace(category, "-", " ", 1) + "</a></b></li>\n")
+				topNav.WriteString("<li><a href=\"" + siteMeta.BaseURL + "/" + currentSection.Crumb + "/" + categoryCrumb + "\">" + strings.Replace(categoryCrumb, "-", " ", 1) + "</a>\n<ul>\n")
+				sectionPageHtml.WriteString("<li><b><a href=\"" + siteMeta.BaseURL + "/" + currentSection.Crumb + "/" + categoryCrumb + "\">" + strings.Replace(category, "-", " ", 1) + "</a></b></li>\n")
 				categoryPageHtml.WriteString("<ul>\n")
 				sectionPageHtml.WriteString("<ul>\n")
 				for _, currentPage := range pages {
 					if currentPage.Category == currentCategory.Title {
-						categoryUrl := strings.Replace(siteConfig.BaseURL+"/"+currentSection.Crumb+"/"+categoryCrumb+"/"+currentPage.Path[strings.LastIndex(currentPage.Path, "/")+1:], ".html", "", 1)
-						fmt.Println(strings.Replace(categoryUrl, ".html", "", 1))
+						categoryUrl := strings.Replace(siteMeta.BaseURL+"/"+currentSection.Crumb+"/"+categoryCrumb+"/"+currentPage.Path[strings.LastIndex(currentPage.Path, "/")+1:], ".html", "", 1)
 						categoryPageHtml.WriteString("<li><a href=\"" + categoryUrl + "\">" + currentPage.Title + "</a></li>\n")
 						sectionPageHtml.WriteString("<li><a href=\"" + categoryUrl + "\">" + currentPage.Title + "</a></li>\n")
 						topNav.WriteString("<li><a href=\"" + categoryUrl + "\">" + currentPage.Title + "</a></li>\n")
@@ -488,25 +559,25 @@ func buildNavigation(sections []Section, categories []Category, pages []Page, pa
 
 				categoryPageHtml.WriteString("</ul>\n")
 				sectionPageHtml.WriteString("</ul>\n")
-				categoryNav := "<a href=\"" + siteConfig.BaseURL + "\">Home</a> // <a href=\"" + siteConfig.BaseURL + "/" + currentSection.Crumb + "\">" + strings.Replace(cases.Title(language.Und).String(currentSection.Crumb), "-", " ", 1) + "</a>" + " // " + strings.Replace(cases.Title(language.Und).String(categoryCrumb), "-", " ", 1)
-
-				//categoryPageUrl := siteConfig.BaseURL + strings.Split(paths.Output, "/out")[1] + "/" + currentSection.Crumb + "/" + categoryCrumb + "/index.html"
-				categoryPageUrl := siteConfig.BaseURL + strings.Split(paths.Output, "/out")[1] + "/" + currentSection.Crumb + "/" + categoryCrumb + "/"
+				categoryNav := "<a href=\"" + siteMeta.BaseURL + "\">Home</a> // <a href=\"" + siteMeta.BaseURL + "/" + currentSection.Crumb + "\">" + strings.Replace(cases.Title(language.Und).String(currentSection.Crumb), "-", " ", 1) + "</a>" + " // " + strings.Replace(cases.Title(language.Und).String(categoryCrumb), "-", " ", 1)
+				categoryPageUrl := siteMeta.BaseURL + strings.Split(sitePaths.Output, "/out")[1] + "/" + currentSection.Crumb + "/" + categoryCrumb + "/"
 
 				categoryPage := Page{
 					Title:       category,
 					Content:     template.HTML(categoryPageHtml.String()),
-					Path:        paths.Output + "/" + currentSection.Crumb + "/" + categoryCrumb + "/index.html",
+					Path:        sitePaths.Output + "/" + currentSection.Crumb + "/" + categoryCrumb + "/index.html",
 					Category:    currentCategory.Title,
 					Section:     currentSection.Title,
 					Index:       currentSection.Index,
-					SiteRoot:    siteConfig.BaseURL,
+					SiteRoot:    siteMeta.BaseURL,
 					Nav:         template.HTML(categoryNav),
-					Analytics:   siteConfig.Analytics,
+					Analytics:   siteMeta.Analytics,
 					Description: template.HTML("Notes, ideas, and research I've captured about " + strings.ToLower(category) + "."),
 					OgType:      "website",
 					Url:         categoryPageUrl,
-					OgImage:     siteConfig.BaseURL + "/media/" + siteConfig.OgImage,
+					OgImage:     siteMeta.BaseURL + "/media/" + siteMeta.OgImage,
+					ChangeFreq:  "weekly",
+					Priority:    "0.8",
 				}
 				pages = append(pages, categoryPage)
 				topNav.WriteString("</ul>\n</li>\n")
@@ -515,25 +586,25 @@ func buildNavigation(sections []Section, categories []Category, pages []Page, pa
 		}
 		sectionPageHtml.WriteString("</ul>\n")
 
-		sectionNav := "<a href=\"" + siteConfig.BaseURL + "\">Home</a> // " + strings.Replace(cases.Title(language.Und).String(currentSection.Crumb), "-", " ", 1)
-
-		//sectionPageUrl := siteConfig.BaseURL + strings.Split(paths.Output, "/out")[1] + "/" + currentSection.Crumb + "/index.html"
-		sectionPageUrl := siteConfig.BaseURL + strings.Split(paths.Output, "/out")[1] + "/" + currentSection.Crumb + "/"
+		sectionNav := "<a href=\"" + siteMeta.BaseURL + "\">Home</a> // " + strings.Replace(cases.Title(language.Und).String(currentSection.Crumb), "-", " ", 1)
+		sectionPageUrl := siteMeta.BaseURL + strings.Split(sitePaths.Output, "/out")[1] + "/" + currentSection.Crumb + "/"
 
 		sectionPage := Page{
 			Title:       currentSection.Title,
 			Content:     template.HTML(sectionPageHtml.String()),
-			Path:        paths.Output + "/" + currentSection.Crumb + "/index.html",
+			Path:        sitePaths.Output + "/" + currentSection.Crumb + "/index.html",
 			Category:    currentSection.Title,
 			Section:     currentSection.Title,
 			Index:       currentSection.Index,
-			SiteRoot:    siteConfig.BaseURL,
+			SiteRoot:    siteMeta.BaseURL,
 			Nav:         template.HTML(sectionNav),
-			Analytics:   siteConfig.Analytics,
+			Analytics:   siteMeta.Analytics,
 			Description: template.HTML("Notes, ideas, and research I've captured in my " + strings.ToLower(currentSection.Title) + "."),
 			OgType:      "website",
 			Url:         sectionPageUrl,
-			OgImage:     siteConfig.BaseURL + "/media/" + siteConfig.OgImage,
+			OgImage:     siteMeta.BaseURL + "/media/" + siteMeta.OgImage,
+			ChangeFreq:  "weekly",
+			Priority:    "1",
 		}
 		pages = append(pages, sectionPage)
 		topNav.WriteString("</ul></li>")
@@ -541,47 +612,80 @@ func buildNavigation(sections []Section, categories []Category, pages []Page, pa
 	return topNav, pages
 }
 
+//Return a single sitemap item (for one url)
+func sitemap(currentPage Page) string {
+	siteMapItem := "  <url>\n"
+	siteMapItem += "    <loc>" + currentPage.Url + "</loc>\n"
+	siteMapItem += "    <changefreq>" + currentPage.ChangeFreq + "</changefreq>\n"
+	siteMapItem += "    <priority>" + currentPage.Priority + "</priority>\n"
+	siteMapItem += "  </url>\n"
+	return siteMapItem
+}
+
+func createRedirects() {
+
+	log.Println("Creating Redirect Files")
+	for _, currentRedirect := range siteRedirects.Redirect {
+		toUrl := siteMeta.BaseURL + currentRedirect.To
+		filePath := sitePaths.Output + currentRedirect.From
+
+		createDirectory(sitePaths.Output + "/" + currentRedirect.From)
+
+		html := "<html><head><meta http-equiv=\"refresh\" content=\"0;URL=" + toUrl + "\"></head><body><h1>Page has moved</h1><p>If not automatically redirected <a href=\"" + toUrl + "\">please click here</a>.</p></body></html>"
+
+		file, err := os.Create(filePath + "index.html")
+		//log.Println("\t", filePath+"index.html")
+		if err != nil {
+			log.Fatal("FATAL: ", err, " Could not create ", filePath+".html", " in createRedirects()")
+		}
+
+		w := bufio.NewWriter(file)
+		w.WriteString(html)
+		w.Flush()
+		defer file.Close()
+	}
+}
+
 func main() {
 
-	currentDirectory, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
+	loadSiteMeta()
+	setPaths()
 
 	var pages []Page
 	var sections []Section
 	var categories []Category
-	//var siteConfig Config
 
-	siteConfig := siteMeta("./content/.config/config.yaml")
-
-	paths := paths(currentDirectory, siteConfig)
-
-	fmt.Printf("Working Directory: %s\n", currentDirectory)
-	fmt.Printf("Content Directory: %s\n", paths.Content)
-	fmt.Printf("Output Directory: %s\n", paths.Output)
-	fmt.Printf("Template Directory: %s\n", paths.Template)
-	fmt.Printf("Asset Directory: %s\n", paths.Asset)
+	log.Println("Working Directory:\t", sitePaths.CurrentDirectory)
+	log.Println("Content Directory:\t", sitePaths.Content)
+	log.Println("Output Directory:\t", sitePaths.Output)
+	log.Println("Template Directory:\t", sitePaths.Template)
+	log.Println("Asset Directory:\t", sitePaths.Asset)
 
 	// To be safe, delete all the output directories and content
-	deleteErr := os.RemoveAll(paths.Output)
-	if err != nil {
-		log.Fatal(deleteErr)
+	deleteErr := os.RemoveAll(sitePaths.Output)
+	if deleteErr != nil {
+		log.Fatalf("FATAL ERROR: %s", deleteErr)
 	}
 
 	// Copy over web assets
-	filepath.WalkDir(paths.Asset, func(currentFile string, info os.DirEntry, err error) error {
-		assetPath := strings.Replace(currentFile, paths.TemplateRoot, "/out", 1)
+	log.Println("Copying web assets")
+	filepath.WalkDir(sitePaths.Asset, func(currentFile string, info os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			log.Fatalf("FATAL ERROR: %s", walkErr.Error())
+		}
+		assetPath := strings.Replace(currentFile, sitePaths.TemplateRoot, "/out", 1)
 
+		//log.Println("\t", assetPath)
 		if info.IsDir() {
 			createDirectory(assetPath)
 		} else {
 			copyFile(currentFile, assetPath)
 		}
 		return nil
+
 	})
 
-	filepath.WalkDir(paths.Content, func(currentFile string, info os.DirEntry, err error) error {
+	filepath.WalkDir(sitePaths.Content, func(currentFile string, info os.DirEntry, err error) error {
 		if err != nil {
 			log.Fatalf("FATAL ERROR: %s", err.Error())
 		}
@@ -589,13 +693,13 @@ func main() {
 		// Skip if it's the .config directory or the site.yaml
 		// We'll still end up with a .git directory due to subdirectories existing but they'll all be empty - this should be fixed
 		if info.Name() == ".config" || info.Name() == "config.yaml" || info.Name() == ".github" || info.Name() == ".git" || info.Name() == "workflows" || info.Name() == "build-site.yaml" {
-			log.Print("INFO: Skipping file/path due to rule: `", info.Name())
+			//log.Print("INFO: Skipping file/path due to rule: `", info.Name())
 			return nil
 		}
 
 		//skip if it's a .config directory, a .yaml file, or a .git file/directory
 		if strings.Contains(currentFile, ".yaml") || strings.Contains(currentFile, ".config") || strings.Contains(currentFile, "README.md") || strings.Contains(currentFile, ".sample") {
-			log.Print("INFO: Skipping file/path due to rule: `", info.Name())
+			//log.Print("INFO: Skipping file/path due to rule: `", info.Name())
 			return nil
 		}
 
@@ -607,13 +711,11 @@ func main() {
 		outPath = strings.Replace(outPath, "_", "", 1)
 
 		if info.IsDir() {
-
 			createDirectory(outPath)
-
 		}
 
 		if filepath.Ext(currentFile) == ".md" {
-			pages = append(pages, parsePage(currentFile, paths, siteConfig))
+			pages = append(pages, parsePage(currentFile))
 
 			if !slices.Contains(sections, pageSection(currentFile)) {
 				sections = append(sections, pageSection(currentFile))
@@ -630,10 +732,29 @@ func main() {
 
 	})
 
-	topNav, pages := buildNavigation(sections, categories, pages, paths, siteConfig)
+	topNav, pages := buildNavigation(sections, categories, pages)
+
+	var siteMap string = ""
 
 	for _, currentPage := range pages {
-		createPage(currentPage, sections, template.HTML(topNav.String()), siteConfig)
-
+		createPage(currentPage, sections, template.HTML(topNav.String()))
+		siteMap += sitemap(currentPage)
 	}
+
+	// Create a sitemap.xml file
+
+	siteMapSchema := "<urlset xmlns:xsi=\"https://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"https://www.sitemaps.org/schemas/sitemap/0.9 https://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd\" xmlns=\"https://www.sitemaps.org/schemas/sitemap/0.9\">\n"
+	siteMapSchema += siteMap + "</urlset>"
+
+	file, err := os.Create(sitePaths.Output + "/sitemap.xml")
+	if err != nil {
+		log.Fatal("FATAL: ", err, " Could not create ", sitePaths.Output+"/sitemap.xml", " in main()")
+	}
+
+	w := bufio.NewWriter(file)
+	w.WriteString(siteMapSchema)
+	w.Flush()
+	defer file.Close()
+
+	createRedirects()
 }

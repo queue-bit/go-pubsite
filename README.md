@@ -20,12 +20,14 @@ You can [read more about this program](https://www.andreaswiebe.com/homelab-note
 - [Files](#files)
   - [/content/index.md](#contentindexmd)
   - [/content/.config/config.yaml](#contentconfigconfigyaml)
+  - [/content/.config/redirects.yaml](#contentconfigredirectsyaml)
   - [Ignored Files](#ignored-files)
 - [Markdown Content Processing](#markdown-content-processing)
   - [Frontmatter](#frontmatter)
   - [Table of Contents](#table-of-contents)
   - [Diagrams](#diagrams)
   - [Mixed Markdown and HTML](#mixed-markdown-and-html)
+  - [Sitemap](#sitemap)
 
 
 # Directories
@@ -133,6 +135,28 @@ ogimage:        Default OpenGraph image, can be overridden by article pages via 
 faviconpath:    The relative path to the favicon
 ```
 
+## /content/.config/redirects.yaml
+
+**Optional file**
+
+Since GitHub Pages don't support `.htaccess` files this simple redirect feature creates barebones HTML pages containing the `http-equiv="refresh"` metatag. Unfortunately this isn't a good solution for SEO but it seems to be the only option with GitHub Pages.
+
+To use this feature, create a new file `/content/.config/redirects.yaml` with the following format:
+ 
+```yaml
+redirect:
+  - from: "/about/about-me/"
+    to: "/about"
+  - from: "/about/about-site/"
+    to: "/about"
+```
+*If you have no redirects, don't create this file.*
+
+This feature currently only supports pretty-url types:
+  - redirecting from `http://1222223.com/my-page/` works 
+  - redirecting from `http://1222223.com/my-page/random.html` does not work
+
+
 ## Ignored Files
 
 When the content directory is processed, filenames and directory names that contain the following are ignored: 
@@ -147,19 +171,14 @@ When the content directory is processed, filenames and directory names that cont
 
 ## Frontmatter
 
-Frontmatter is supported, defined at the top of the document between three dashes `---`. Currently supported tags:
+Frontmatter is supported, defined at the top of the document between three dashes `---`, all tags are now optional.
 
-1. title
-1. excerpt
-1. tags (future use)
+Example with currently supported tags:
 
-Note that the excerpt is displayed on content pages between the breadcrumb navigation and TOC.
-
-Example:
 ```
 ---
-title:        "A sample title"
-intro:        "Excerpt I want to display between the breadcrumbs and the TOC"
+title:        "A sample title, this title shows in navigation and on the page (does not affect URL's)."
+intro:        "An introduction that displays between the breadcrumbs and the TOC."
 tags:         "Comma separated list of tags, used in OpenGraph metadata on the site"
 ogtype:       "OpenGraph type for the page"
 author:       "Author for the page, used in OpenGraph metadata"
@@ -168,6 +187,18 @@ date:         "Publish date for the page, used in OpenGraph metadata"
 ogimage:      "OpenGraph image for the page, used in OpenGraph metadata"
 ---
 ```
+
+Defaults:
+
+Defaults are shown when the tag isn't defined in the frontmatter, you can override these by including the tag with an empty string (example: `title: ""`) but I don't recommend it.
+
+|Tag|Default|
+|-|-|
+|title| Filename (including extension)|
+|ogtype|Default OpenGraph type as defined in the config.yaml file|
+|author|Default author type as defined in the config.yaml file|
+|ogimage|Default ogimage as defined in the config.yaml file|
+
 
 ## Table of Contents
 
@@ -192,5 +223,17 @@ graph TD;
 HTML is allowed in the markdown files and will be passed along as-is.
 
 
+## Sitemap
 
+Creates a sitemap.xml file in the root.
+
+Page **priority** and **change frequency** are hardcoded and set as follows:
+
+|Page|Priority|Change Frequency|
+|-|-|-|
+|Article|0.5|monthly|
+|Section|1|weekly|
+|Category|0.8|weekly|
+
+There is currently no override for these values.
 

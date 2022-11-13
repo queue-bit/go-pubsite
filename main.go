@@ -333,6 +333,14 @@ func parsePage(workingFile string) Page {
 		pageNav += strings.Replace(cases.Title(language.Und).String(categoryCrumb), "-", " ", 1) + "</a> // " + title
 	}
 
+	var canonUrl string
+
+	if pageUrl == siteMeta.BaseURL+"/index.html" {
+		canonUrl = siteMeta.BaseURL
+	} else {
+		canonUrl = strings.Replace(pageUrl, ".html", "", 1)
+	}
+
 	return Page{
 		Title:       title,
 		Content:     template.HTML(buf.String()),
@@ -347,7 +355,7 @@ func parsePage(workingFile string) Page {
 		Analytics:   siteMeta.Analytics,
 		Author:      siteMeta.Author,
 		OgType:      ogType,
-		Url:         strings.Replace(pageUrl, ".html", "", 1),
+		Url:         canonUrl,
 		Date:        articleDate,
 		OgImage:     ogImage,
 		Tags:        tags,

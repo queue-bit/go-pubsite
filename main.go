@@ -34,8 +34,10 @@ type Config struct {
 	Domain        string        `yaml:"domain"`
 	Email         string        `yaml:"email"`
 	Github        string        `yaml:"github"`
+	Facebook      string        `yaml:"facebook"`
 	Linkedin      string        `yaml:"linkedin"`
 	Twitter       string        `yaml:"twitter"`
+	Mastodon      string        `yaml:"mastodon"`
 	TemplateName  string        `yaml:"templatename"`
 	BaseURL       string        `yaml:"baseurl"`
 	Analytics     template.HTML `yaml:"analytics"`

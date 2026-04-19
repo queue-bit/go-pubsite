@@ -58,7 +58,7 @@ type Page struct {
 	Title       string
 	Content     template.HTML
 	Path        string
-	SiteRoot    string
+	SiteRoot    template.URL
 	Category    string
 	Section     string
 	Index       int
@@ -68,7 +68,7 @@ type Page struct {
 	Description template.HTML
 	OgType      string
 	Author      string
-	Url         string
+	Url         template.URL
 	Date        string
 	OgImage     string
 	Tags        string
@@ -266,8 +266,9 @@ func parsePage(workingFile string) Page {
 		panic(err)
 	}
 	frontMatter := meta.Get(context)
-	pageCategory := pageCategory(workingFile)
-	pageSection := pageSection(workingFile)
+	relPath := strings.TrimPrefix(workingFile, sitePaths.Content)
+	pageCategory := pageCategory(relPath)
+	pageSection := pageSection(relPath)
 
 	var title string
 	if frontMatter["title"] == nil {
@@ -356,14 +357,14 @@ func parsePage(workingFile string) Page {
 		Category:    pageCategory.Title,
 		Section:     pageSection.Title,
 		Index:       pageSection.Index,
-		SiteRoot:    siteMeta.BaseURL,
+		SiteRoot:    template.URL(siteMeta.BaseURL),
 		Nav:         template.HTML(pageNav),
 		Intro:       template.HTML(pageIntro),
 		Description: template.HTML(pageDescription),
 		Analytics:   siteMeta.Analytics,
 		Author:      siteMeta.Author,
 		OgType:      ogType,
-		Url:         canonUrl,
+		Url:         template.URL(canonUrl),
 		Date:        articleDate,
 		OgImage:     ogImage,
 		Tags:        tags,
@@ -584,12 +585,12 @@ func buildNavigation(sections []Section, categories []Category, pages []Page) (s
 					Category:    currentCategory.Title,
 					Section:     currentSection.Title,
 					Index:       currentSection.Index,
-					SiteRoot:    siteMeta.BaseURL,
+					SiteRoot:    template.URL(siteMeta.BaseURL),
 					Nav:         template.HTML(categoryNav),
 					Analytics:   siteMeta.Analytics,
 					Description: template.HTML("Notes, ideas, and research I've captured about " + strings.ToLower(category) + "."),
 					OgType:      "website",
-					Url:         categoryPageUrl,
+					Url:         template.URL(categoryPageUrl),
 					OgImage:     siteMeta.BaseURL + "/media/" + siteMeta.OgImage,
 					ChangeFreq:  "weekly",
 					Priority:    "0.8",
@@ -611,12 +612,12 @@ func buildNavigation(sections []Section, categories []Category, pages []Page) (s
 			Category:    currentSection.Title,
 			Section:     currentSection.Title,
 			Index:       currentSection.Index,
-			SiteRoot:    siteMeta.BaseURL,
+			SiteRoot:    template.URL(siteMeta.BaseURL),
 			Nav:         template.HTML(sectionNav),
 			Analytics:   siteMeta.Analytics,
 			Description: template.HTML("Notes, ideas, and research I've captured in my " + strings.ToLower(currentSection.Title) + "."),
 			OgType:      "website",
-			Url:         sectionPageUrl,
+			Url:         template.URL(sectionPageUrl),
 			OgImage:     siteMeta.BaseURL + "/media/" + siteMeta.OgImage,
 			ChangeFreq:  "weekly",
 			Priority:    "1",
@@ -630,7 +631,7 @@ func buildNavigation(sections []Section, categories []Category, pages []Page) (s
 //Return a single sitemap item (for one url)
 func sitemap(currentPage Page) string {
 	siteMapItem := "  <url>\n"
-	siteMapItem += "    <loc>" + currentPage.Url + "</loc>\n"
+	siteMapItem += "    <loc>" + string(currentPage.Url) + "</loc>\n"
 	siteMapItem += "    <changefreq>" + currentPage.ChangeFreq + "</changefreq>\n"
 	siteMapItem += "    <priority>" + currentPage.Priority + "</priority>\n"
 	siteMapItem += "  </url>\n"
@@ -734,12 +735,13 @@ func main() {
 		if filepath.Ext(currentFile) == ".md" {
 			pages = append(pages, parsePage(currentFile))
 
-			if !slices.Contains(sections, pageSection(currentFile)) {
-				sections = append(sections, pageSection(currentFile))
+			relFile := strings.TrimPrefix(currentFile, sitePaths.Content)
+			if !slices.Contains(sections, pageSection(relFile)) {
+				sections = append(sections, pageSection(relFile))
 			}
 
-			if !slices.Contains(categories, pageCategory(currentFile)) {
-				categories = append(categories, pageCategory(currentFile))
+			if !slices.Contains(categories, pageCategory(relFile)) {
+				categories = append(categories, pageCategory(relFile))
 			}
 
 		} else if filepath.Ext(currentFile) != "" {

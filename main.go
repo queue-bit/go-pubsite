@@ -128,8 +128,9 @@ func loadSiteMeta() {
 
 	if err := c.Decode(&config); err != nil {
 		siteMeta = Config{}
+	} else {
+		siteMeta = config
 	}
-	siteMeta = config
 
 	//--- Get redirects from file if it exists
 	if _, err := os.Stat(redirectFile); err == nil {
@@ -149,8 +150,9 @@ func loadSiteMeta() {
 
 		if err := r.Decode(&redirects); err != nil {
 			siteRedirects = Redirects{}
+		} else {
+			siteRedirects = redirects
 		}
-		siteRedirects = redirects
 	} else {
 		log.Println("No Redirects file, skipping.")
 		return
@@ -216,10 +218,10 @@ func pageCategory(workingFile string) Category {
 
 	categoryMatches := categoryRe.FindAllStringSubmatch(workingFile, -1)
 	if len(categoryMatches) == 2 {
-		parentCategory = fmt.Sprintf("%s", categoryMatches[0])
-		category = fmt.Sprintf("%s", categoryMatches[1])
+		parentCategory = categoryMatches[0][1]
+		category = categoryMatches[1][1]
 	} else if len(categoryMatches) == 1 {
-		category = fmt.Sprintf("%s", categoryMatches[0])
+		category = categoryMatches[0][1]
 	} else {
 		category = ""
 	}
@@ -238,7 +240,7 @@ func parsePage(workingFile string) Page {
 
 	content, err := ioutil.ReadFile(workingFile)
 	if err != nil {
-		log.Print("ERROR: ", err, " workingFile: ", workingFile, " in parsePage(string,paths,config)->ReadFile")
+		log.Fatal("FATAL: ", err, " workingFile: ", workingFile, " in parsePage(string,paths,config)->ReadFile")
 	}
 
 	md := goldmark.New(
@@ -303,27 +305,31 @@ func parsePage(workingFile string) Page {
 	}
 
 	var tags string
-	if frontMatter["tags"] == nil {
-		tags = ""
-	} else {
-		tags = frontMatter["tags"].(string)
+	if frontMatter["tags"] != nil {
+		if v, ok := frontMatter["tags"].(string); ok {
+			tags = v
+		} else {
+			tags = fmt.Sprintf("%v", frontMatter["tags"])
+		}
 	}
 
 	var articleDate string
-	if frontMatter["date"] == nil {
-		articleDate = ""
-	} else {
-		articleDate = frontMatter["date"].(string)
+	if frontMatter["date"] != nil {
+		if v, ok := frontMatter["date"].(string); ok {
+			articleDate = v
+		} else {
+			articleDate = fmt.Sprintf("%v", frontMatter["date"])
+		}
 	}
 
 	outFile = strings.Replace(outFile, strconv.Itoa(pageSection.Index)+"_", "", 1)
-	outFile = strings.Replace(outFile, "_", "", 1)
+	outFile = strings.ReplaceAll(outFile, "/_", "/")
 
 	var categoryCrumb string
 	categoryCrumb = pageCategory.Crumb[strings.LastIndex(pageCategory.Crumb, " ")+1:]
 	categoryCrumb = strings.TrimRight(categoryCrumb, "]")
 
-	pageUrl := siteMeta.BaseURL + strings.Split(outFile, "/out")[1]
+	pageUrl := siteMeta.BaseURL + strings.TrimPrefix(outFile, sitePaths.Output)
 
 	var pageNav string
 	if pageSection.Crumb == "" {
@@ -408,13 +414,6 @@ func createPage(currentPage Page, sections []Section, topNav template.HTML) {
 	var templateFiles = []string{"header.html", "footer.html", "body.html", "base.html"}
 	var allPaths []string
 
-	file, err := os.Create(currentPage.Path)
-	if err != nil {
-		log.Fatal("FATAL: ", err, " Could not create ", currentPage.Path, " in createPage(Page,Section,template.HTML,Config)")
-	}
-
-	defer file.Close()
-
 	for _, tmpl := range templateFiles {
 		allPaths = append(allPaths, "./"+sitePaths.TemplateSub+tmpl)
 	}
@@ -424,17 +423,23 @@ func createPage(currentPage Page, sections []Section, topNav template.HTML) {
 	Toc := addToc(string(currentPage.Content), string(currentPage.Title))
 
 	var processed bytes.Buffer
-	err = templates.ExecuteTemplate(&processed, "Base", struct{ CurrentPage, SiteMetaData, TopNav, Toc, Sections interface{} }{currentPage, siteMeta, topNav, Toc, sections})
+	err := templates.ExecuteTemplate(&processed, "Base", struct{ CurrentPage, SiteMetaData, TopNav, Toc, Sections interface{} }{currentPage, siteMeta, topNav, Toc, sections})
 
 	if err != nil {
 		log.Fatal("FATAL: ", err, " Could not ExecuteTemplate for ", currentPage.Path, " in createPage(Page,Section,template.HTML,Config")
 	}
 
-	f, _ := os.Create(currentPage.Path)
+	f, err := os.Create(currentPage.Path)
+	if err != nil {
+		log.Fatal("FATAL: ", err, " Could not create ", currentPage.Path, " in createPage(Page,Section,template.HTML,Config)")
+	}
+	defer f.Close()
+
 	w := bufio.NewWriter(f)
 	w.WriteString(processed.String())
-	w.Flush()
-	defer f.Close()
+	if err := w.Flush(); err != nil {
+		log.Fatal("FATAL: ", err, " Could not flush ", currentPage.Path, " in createPage()")
+	}
 
 }
 
@@ -466,10 +471,10 @@ func addToc(currentHtmlString string, currentTitle string) template.HTML {
 
 		if hasAttr {
 			attrKey, attrValue, _ := tokenizer.TagAttr()
-			tokenizer.Next() //Need to move it one to get the text value
-			tocLinkItem := "<a href=\"#" + string(attrValue) + "\">" + string(tokenizer.Token().Data) + "</a>"
 
 			if string(attrKey) == "id" {
+				tokenizer.Next() //Need to move it one to get the text value
+				tocLinkItem := "<a href=\"#" + string(attrValue) + "\">" + string(tokenizer.Token().Data) + "</a>"
 
 				switch string(tag) {
 				case "h2": // H1 is always the site title so we start at H2
@@ -570,7 +575,7 @@ func buildNavigation(sections []Section, categories []Category, pages []Page) (s
 				categoryPageHtml.WriteString("</ul>\n")
 				sectionPageHtml.WriteString("</ul>\n")
 				categoryNav := "<a href=\"" + siteMeta.BaseURL + "\">Home</a> // <a href=\"" + siteMeta.BaseURL + "/" + currentSection.Crumb + "\">" + strings.Replace(cases.Title(language.Und).String(currentSection.Crumb), "-", " ", 1) + "</a>" + " // " + strings.Replace(cases.Title(language.Und).String(categoryCrumb), "-", " ", 1)
-				categoryPageUrl := siteMeta.BaseURL + strings.Split(sitePaths.Output, "/out")[1] + "/" + currentSection.Crumb + "/" + categoryCrumb + "/"
+				categoryPageUrl := siteMeta.BaseURL + "/" + currentSection.Crumb + "/" + categoryCrumb + "/"
 
 				categoryPage := Page{
 					Title:       category,
@@ -597,7 +602,7 @@ func buildNavigation(sections []Section, categories []Category, pages []Page) (s
 		sectionPageHtml.WriteString("</ul>\n")
 
 		sectionNav := "<a href=\"" + siteMeta.BaseURL + "\">Home</a> // " + strings.Replace(cases.Title(language.Und).String(currentSection.Crumb), "-", " ", 1)
-		sectionPageUrl := siteMeta.BaseURL + strings.Split(sitePaths.Output, "/out")[1] + "/" + currentSection.Crumb + "/"
+		sectionPageUrl := siteMeta.BaseURL + "/" + currentSection.Crumb + "/"
 
 		sectionPage := Page{
 			Title:       currentSection.Title,
@@ -651,8 +656,10 @@ func createRedirects() {
 
 		w := bufio.NewWriter(file)
 		w.WriteString(html)
-		w.Flush()
-		defer file.Close()
+		if err := w.Flush(); err != nil {
+			log.Fatal("FATAL: ", err, " Could not flush ", filePath+"index.html", " in createRedirects()")
+		}
+		file.Close()
 	}
 }
 
@@ -718,7 +725,7 @@ func main() {
 		sectionMeta := pageSection(outPath + "/")
 
 		outPath = strings.Replace(outPath, strconv.Itoa(sectionMeta.Index)+"_", "", 1)
-		outPath = strings.Replace(outPath, "_", "", 1)
+		outPath = strings.ReplaceAll(outPath, "/_", "/")
 
 		if info.IsDir() {
 			createDirectory(outPath)
@@ -760,11 +767,13 @@ func main() {
 	if err != nil {
 		log.Fatal("FATAL: ", err, " Could not create ", sitePaths.Output+"/sitemap.xml", " in main()")
 	}
+	defer file.Close()
 
 	w := bufio.NewWriter(file)
 	w.WriteString(siteMapSchema)
-	w.Flush()
-	defer file.Close()
+	if err := w.Flush(); err != nil {
+		log.Fatal("FATAL: ", err, " Could not flush sitemap.xml in main()")
+	}
 
 	createRedirects()
 }
